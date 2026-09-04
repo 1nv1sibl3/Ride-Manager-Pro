@@ -1,0 +1,261 @@
+@import "tailwindcss";
+
+/* Class-based dark mode — next-themes toggles .dark on <html>. Without this
+   custom variant, Tailwind's default dark: follows the OS color-scheme
+   preference instead of the app theme toggle. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Design tokens ───────────────────────────────────────────────
+   Two layers:
+   1. --c-* custom properties (switched by .dark) — referenced by the
+      semantic classes below and available as inline vars.
+   2. @theme inline mappings — expose the same tokens as Tailwind
+      utilities (bg-surface, text-muted, border-border, text-fg, …).
+      `inline` keeps the utilities pointing at var(--c-*) so they
+      cascade correctly when .dark flips the values. */
+:root {
+  --c-bg: #ffffff;
+  --c-surface: #ffffff;
+  --c-surface-2: #f4f4f5;            /* zinc-100 */
+  --c-surface-3: #e4e4e7;            /* zinc-200 */
+  --c-border: #e4e4e7;
+  --c-border-strong: #d4d4d8;
+  --c-text: #18181b;                 /* zinc-900 */
+  --c-muted: #71717a;                /* zinc-500 */
+  --c-muted-2: #a1a1aa;
+  --c-primary: #2563eb;              /* blue-600 */
+  --c-primary-fg: #ffffff;
+  --c-primary-soft: #eff6ff;
+  --c-danger: #dc2626;
+  --c-danger-soft: #fef2f2;
+  --c-success: #16a34a;
+  --c-success-soft: #f0fdf4;
+  --c-warn: #d97706;
+  --c-warn-soft: #fffbeb;
+  --c-ring: rgba(37, 99, 235, 0.35);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.dark {
+  --c-bg: #09090b;                   /* zinc-950 */
+  --c-surface: #18181b;              /* zinc-900 */
+  --c-surface-2: #27272a;            /* zinc-800 */
+  --c-surface-3: #3f3f46;            /* zinc-700 */
+  --c-border: #27272a;
+  --c-border-strong: #3f3f46;
+  --c-text: #fafafa;
+  --c-muted: #a1a1aa;
+  --c-muted-2: #71717a;
+  --c-primary: #3b82f6;
+  --c-primary-fg: #ffffff;
+  --c-primary-soft: rgba(59, 130, 246, 0.12);
+  --c-danger: #ef4444;
+  --c-danger-soft: rgba(239, 68, 68, 0.12);
+  --c-success: #22c55e;
+  --c-success-soft: rgba(34, 197, 94, 0.12);
+  --c-warn: #f59e0b;
+  --c-warn-soft: rgba(245, 158, 11, 0.12);
+  --c-ring: rgba(59, 130, 246, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+@theme inline {
+  --color-bg: var(--c-bg);
+  --color-surface: var(--c-surface);
+  --color-surface-2: var(--c-surface-2);
+  --color-surface-3: var(--c-surface-3);
+  --color-border: var(--c-border);
+  --color-border-strong: var(--c-border-strong);
+  --color-fg: var(--c-text);
+  --color-muted: var(--c-muted);
+  --color-muted-2: var(--c-muted-2);
+  --color-primary: var(--c-primary);
+  --color-primary-fg: var(--c-primary-fg);
+  --color-primary-soft: var(--c-primary-soft);
+  --color-danger: var(--c-danger);
+  --color-danger-soft: var(--c-danger-soft);
+  --color-success: var(--c-success);
+  --color-success-soft: var(--c-success-soft);
+  --color-warn: var(--c-warn);
+  --color-warn-soft: var(--c-warn-soft);
+  --color-ring: var(--c-ring);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+html, body {
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { border-color: var(--c-border); }
+
+/* ── Semantic component classes ─────────────────────────────────── */
+
+/* Form controls */
+.input, .select, .textarea {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
+  color: var(--c-text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
+  font-size: 14px;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.input::placeholder, .textarea::placeholder { color: var(--c-muted-2); }
+.input:focus, .select:focus, .textarea:focus {
+  outline: none;
+  border-color: var(--c-primary);
+  box-shadow: 0 0 0 3px var(--c-ring);
+}
+.input:disabled, .select:disabled, .textarea:disabled { opacity: 0.6; cursor: not-allowed; }
+.label { font-size: 12px; color: var(--c-muted); margin-bottom: 4px; display: block; font-weight: 500; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 14px; border-radius: 8px; font-size: 14px; font-weight: 500;
+  border: 1px solid var(--c-border-strong);
+  background: var(--c-surface);
+  color: var(--c-text);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, transform 0.04s;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--c-surface-2); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--c-ring); }
+.btn-primary {
+  background: var(--c-primary);
+  color: var(--c-primary-fg);
+  border-color: var(--c-primary);
+}
+.btn-primary:hover { background: var(--c-primary); filter: brightness(1.08); }
+.btn-danger {
+  background: var(--c-danger);
+  color: white;
+  border-color: var(--c-danger);
+}
+.btn-danger:hover { filter: brightness(1.08); background: var(--c-danger); }
+.btn-ghost { background: transparent; border-color: transparent; }
+.btn-ghost:hover { background: var(--c-surface-2); }
+.btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+
+/* Cards */
+.card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Badges */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  color: var(--c-text);
+  line-height: 1.5;
+}
+.badge::before {
+  content: "";
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+}
+.badge-neutral { background: var(--c-surface-2); color: var(--c-muted); }
+.badge-info { background: var(--c-primary-soft); color: var(--c-primary); border-color: transparent; }
+.badge-success { background: var(--c-success-soft); color: var(--c-success); border-color: transparent; }
+.badge-warn { background: var(--c-warn-soft); color: var(--c-warn); border-color: transparent; }
+.badge-danger { background: var(--c-danger-soft); color: var(--c-danger); border-color: transparent; }
+
+/* Tables */
+table.t { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.t th, table.t td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--c-border); }
+table.t th {
+  font-weight: 500;
+  color: var(--c-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--c-surface-2);
+  white-space: nowrap;
+}
+table.t tbody tr { transition: background 0.08s; }
+table.t tbody tr:hover td { background: var(--c-surface-2); }
+table.t tbody tr:last-child td { border-bottom: 0; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Links */
+a { color: inherit; }
+.link { color: var(--c-primary); text-decoration: none; font-weight: 500; }
+.link:hover { text-decoration: underline; }
+
+/* Sidebar nav item */
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--c-muted);
+  transition: background 0.1s, color 0.1s;
+}
+.nav-item:hover { background: var(--c-surface-2); color: var(--c-text); }
+.nav-item-active {
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  font-weight: 500;
+}
+.nav-item-active:hover { background: var(--c-primary-soft); color: var(--c-primary); }
+
+/* Timeline */
+.tl { position: relative; padding-left: 20px; }
+.tl::before {
+  content: ""; position: absolute; left: 5px; top: 4px; bottom: 4px;
+  width: 2px; background: var(--c-border);
+}
+.tl-item { position: relative; padding-bottom: 16px; }
+.tl-item::before {
+  content: ""; position: absolute; left: -19px; top: 6px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--c-surface); border: 2px solid var(--c-primary);
+}
+
+/* Status pill colors per booking status */
+.status-booked { background: var(--c-primary-soft); color: var(--c-primary); border-color: transparent; }
+.status-handed_over, .status-active { background: var(--c-warn-soft); color: var(--c-warn); border-color: transparent; }
+.status-returned { background: var(--c-success-soft); color: var(--c-success); border-color: transparent; }
+.status-closed { background: var(--c-surface-2); color: var(--c-muted); border-color: transparent; }
+.status-cancelled { background: var(--c-danger-soft); color: var(--c-danger); border-color: transparent; }
+.status-overdue { background: var(--c-danger-soft); color: var(--c-danger); border-color: transparent; }
+
+/* Toast entrance */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.toast-in { animation: toast-in 0.15s ease-out; }
+
+/* Dialog entrance */
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.dialog-in { animation: dialog-in 0.15s ease-out; }
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}

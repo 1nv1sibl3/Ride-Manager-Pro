@@ -1,0 +1,363 @@
+// ProBikes — Prisma schema (Postgres)
+// Per-vehicle pricing. Bookings can be amended (vehicle swap, date change, price adjust).
+// Revenue = current quotedAmount on the booking (NOT sum of amendments) — see lib/pricing notes.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  owner
+  staff
+  manager
+}
+
+enum VehicleStatus {
+  available
+  rented
+  maintenance
+  retired
+}
+
+// Lifecycle: booked → handed_over → returned → closed (+ cancelled).
+// "active" kept as alias for handed_over for back-compat with older rows.
+enum BookingStatus {
+  booked
+  handed_over
+  returned
+  closed
+  cancelled
+  // legacy values still present in DB:
+  reserved
+  active
+}
+
+enum BookingSource {
+  offline
+  online
+}
+
+enum RatePlan {
+  daily
+  monthly
+}
+
+enum PaymentKind {
+  advance
+  balance
+  deposit
+  refund
+  extra
+  amendment       // delta charged/refunded on a vehicle swap or rate change
+}
+
+enum PaymentMode {
+  cash
+  upi
+  card
+  bank
+  other
+}
+
+enum AuditAction {
+  insert
+  update
+  delete
+}
+
+model User {
+  id           String     @id @default(uuid())
+  username     String     @unique
+  passwordHash String
+  fullName     String
+  email        String?
+  phone        String?
+  role         Role       @default(staff)
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  bookings     Booking[]  @relation("CreatedBy")
+  payments     Payment[]  @relation("RecordedBy")
+  amendments   BookingAmendment[] @relation("AmendmentBy")
+  audits       AuditLog[]
+  sessions     Session[]
+  notifications Notification[]
+  reminders    Reminder[] @relation("ReminderBy")
+  services     ServiceRecord[] @relation("ServiceBy")
+  accessoryLogs AccessoryLog[] @relation("AccessoryBy")
+}
+
+// Server-side session store. Cookie carries only the opaque session id.
+// Revoking = deleting the row. Stale cookies after a DB purge stop working.
+model Session {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  lastSeenAt DateTime @default(now())
+  userAgent  String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Vehicle {
+  // Sr. no. is the human-assigned shop inventory number AND the primary key.
+  // No system-generated cuids — what staff calls vehicle "12" is also vehicle 12 in the DB.
+  srNo        Int           @id
+  plate       String        @unique
+  model       String
+  // Free-text grouping for analytics. e.g. category="Scooter" series="Activa".
+  category    String?
+  series      String?
+  color       String?
+  year        Int?
+  odometer    Int           @default(0)
+  status      VehicleStatus @default(available)
+  notes       String?
+
+  dailyRate   Int           @default(0)
+  monthlyRate Int           @default(0)
+  deposit     Int           @default(0)
+
+  bookings    Booking[]
+  amendmentsFrom BookingAmendment[] @relation("FromVehicle")
+  amendmentsTo   BookingAmendment[] @relation("ToVehicle")
+  reminders   Reminder[]
+  services    ServiceRecord[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([model])
+  @@index([status])
+  @@index([category])
+  @@index([series])
+}
+
+model Booking {
+  // UUID so URLs look like /bookings/550e8400-… instead of an opaque cuid.
+  // Postgres rejects duplicate ids at the DB level — no collisions possible.
+  id              String        @id @default(uuid())
+  refNumber       Int           @unique @default(autoincrement())
+  source          BookingSource @default(offline)
+  externalRef     String?
+  status          BookingStatus @default(booked)
+
+  customerName    String
+  customerPhone   String
+  altPhone        String?
+  email           String?
+  address         String?
+  altAddress      String?
+
+  docsReceived    String[]
+  docsNote        String?
+  otpCode         String?
+
+  vehicleId       Int
+  vehicle         Vehicle       @relation(fields: [vehicleId], references: [srNo])
+
+  plan            RatePlan
+  startAt         DateTime
+  endAt           DateTime
+
+  // Lifecycle timestamps (IST stored as UTC).
+  handedOverAt    DateTime?
+  actualReturnAt  DateTime?
+  closedAt        DateTime?
+
+  // Current effective pricing (updated by amendments).
+  rateUsed        Int           @default(0)
+  quotedAmount    Int
+  depositAmount   Int           @default(0)
+
+  // Handover / return condition fields
+  odometerOut     Int?
+  odometerIn      Int?
+  fuelOut         String?       // e.g. "F", "1/2", "1/4"
+  fuelIn          String?
+  conditionOutNote String?
+  conditionInNote  String?
+  damageCharges    Int          @default(0)
+
+  payments         Payment[]
+  amendments       BookingAmendment[]
+  reminders        Reminder[]
+  createdById      String
+  createdBy        User         @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([status])
+  @@index([vehicleId])
+  @@index([startAt])
+}
+
+// Each amendment is an immutable record of a change to a booking after creation.
+// quotedAmount on Booking always reflects the *latest* state — amendments are the audit trail.
+model BookingAmendment {
+  id              String   @id @default(uuid())
+  bookingId       String
+  booking         Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  reason          String   // free text from staff
+  kind            String   // "vehicle_swap" | "date_change" | "rate_change" | "mixed"
+
+  fromVehicleId   Int?
+  fromVehicle     Vehicle? @relation("FromVehicle", fields: [fromVehicleId], references: [srNo])
+  toVehicleId     Int?
+  toVehicle       Vehicle? @relation("ToVehicle", fields: [toVehicleId], references: [srNo])
+
+  fromStartAt     DateTime?
+  toStartAt       DateTime?
+  fromEndAt       DateTime?
+  toEndAt         DateTime?
+
+  fromRateUsed       Int?
+  toRateUsed         Int?
+  fromQuotedAmount   Int
+  toQuotedAmount     Int
+  // Positive = customer paid more, negative = refund, 0 = even swap.
+  deltaCharged       Int   @default(0)
+
+  createdById     String
+  createdBy       User     @relation("AmendmentBy", fields: [createdById], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@index([bookingId])
+}
+
+model Payment {
+  id            String      @id @default(uuid())
+  bookingId     String
+  booking       Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  kind          PaymentKind
+  amount        Int
+  mode          PaymentMode
+  reference     String?
+  note          String?
+  recordedById  String
+  recordedBy    User        @relation("RecordedBy", fields: [recordedById], references: [id])
+  createdAt     DateTime    @default(now())
+
+  @@index([bookingId])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String      @id @default(uuid())
+  tableName String
+  rowId     String
+  action    AuditAction
+  actorId   String?
+  actor     User?       @relation(fields: [actorId], references: [id])
+  before    Json?
+  after     Json?
+  createdAt DateTime    @default(now())
+
+  @@index([tableName, rowId])
+  @@index([createdAt])
+}
+
+// ── Notifications ─────────────────────────────────────────────────
+// Fanned out to one row per recipient at event time. A shop has a handful of
+// users, so this keeps read/unread queries trivial with no join state.
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String    // booking_created | booking_handed_over | booking_returned |
+                      // booking_closed | booking_cancelled | booking_amended |
+                      // conflict_detected | payment_recorded | payment_edited |
+                      // payment_deleted | user_created | user_updated |
+                      // reminder_due | service_due | low_stock | email_failed
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+}
+
+// ── Reminders ─────────────────────────────────────────────────────
+// Manual (staff-created) or system-generated. System reminders carry a
+// unique systemKey so the scanner never creates duplicates.
+model Reminder {
+  id          String    @id @default(uuid())
+  title       String
+  notes       String?
+  dueAt       DateTime
+  vehicleId   Int?
+  vehicle     Vehicle?  @relation(fields: [vehicleId], references: [srNo], onDelete: SetNull)
+  bookingId   String?
+  booking     Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  createdById String
+  createdBy   User      @relation("ReminderBy", fields: [createdById], references: [id])
+  doneAt      DateTime?
+  systemKey   String?   @unique  // e.g. "overdue:<bookingId>"
+  createdAt   DateTime  @default(now())
+
+  @@index([dueAt, doneAt])
+}
+
+// ── Maintenance ───────────────────────────────────────────────────
+model ServiceRecord {
+  id              String    @id @default(uuid())
+  vehicleId       Int
+  vehicle         Vehicle   @relation(fields: [vehicleId], references: [srNo], onDelete: Cascade)
+  description     String
+  odometer        Int?
+  cost            Int       @default(0)
+  servicedAt      DateTime
+  nextDueOdometer Int?
+  nextDueDate     DateTime?
+  createdById     String
+  createdBy       User      @relation("ServiceBy", fields: [createdById], references: [id])
+  createdAt       DateTime  @default(now())
+
+  @@index([vehicleId, servicedAt])
+  @@index([nextDueDate])
+}
+
+// ── Accessories inventory ─────────────────────────────────────────
+// Helmets, locks, etc. Tracked separately from vehicles; issuing to a booking
+// records only a reference string — pricing/settlement is not touched.
+model Accessory {
+  id                String         @id @default(uuid())
+  name              String         @unique
+  category          String?
+  stock             Int            @default(0)
+  unitPrice         Int?
+  lowStockThreshold Int            @default(2)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  logs              AccessoryLog[]
+}
+
+model AccessoryLog {
+  id          String    @id @default(uuid())
+  accessoryId String
+  accessory   Accessory @relation(fields: [accessoryId], references: [id], onDelete: Cascade)
+  quantity    Int       // signed: +restock/return, −issue/damaged
+  kind        String    // restock | issue | return | adjust | damaged
+  bookingRef  String?
+  note        String?
+  createdById String
+  createdBy   User      @relation("AccessoryBy", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([accessoryId, createdAt])
+}
+
+// Small key-value store for singletons (e.g. last reminder-digest run).
+model AppSetting {
+  key   String @id
+  value Json
+}

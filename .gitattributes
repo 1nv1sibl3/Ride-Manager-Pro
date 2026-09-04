@@ -1,0 +1,11 @@
+# Normalize line endings: LF in the repo and working copy everywhere.
+* text=auto eol=lf
+
+# Windows scripts keep CRLF
+*.bat text eol=crlf
+
+# Binaries
+*.png binary
+*.ico binary
+*.woff binary
+*.woff2 binary

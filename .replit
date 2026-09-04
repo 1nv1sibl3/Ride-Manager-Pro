@@ -1,0 +1,19 @@
+# Replit workspace + deployment config.
+# Set DATABASE_URL (and optionally RESEND_API_KEY etc.) as Replit Secrets
+# before the first run. The session-pooler Supabase URL works for both the
+# schema sync and the app runtime.
+
+run = "npm run dev"
+
+modules = ["nodejs-20", "postgresql-16"]
+
+entrypoint = "app/page.tsx"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[deployment]
+run = ["sh", "-c", "npm run start"]
+build = ["sh", "-c", "npm install && npm run build"]
+deploymentTarget = "autoscale"

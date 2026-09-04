@@ -1,0 +1,56 @@
+{
+  "name": "probikes-admin",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "predev": "node scripts/db-sync.mjs",
+    "dev": "next dev",
+    "prebuild": "node scripts/db-sync.mjs",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "setup": "prisma generate && prisma db push && npm run db:seed",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:seed:demo": "tsx scripts/seed-demo.ts",
+    "db:studio": "prisma studio",
+    "icons": "node scripts/generate-icons.mjs",
+    "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "@react-email/components": "^1.0.12",
+    "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.1",
+    "geist": "^1.7.2",
+    "lucide-react": "^0.577.0",
+    "next": "^16.2.9",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "recharts": "^3.10.1",
+    "resend": "^6.26.0",
+    "tailwind-merge": "^2.5.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "prisma": "^5.22.0",
+    "sharp": "^0.35.4",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^5.0.0"
+  }
+}
